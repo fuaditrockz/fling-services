@@ -2,16 +2,19 @@ const admin           = require('firebase-admin');
 const express         = require('express');
 const firebaseHelper  = require('firebase-functions-helper');
 const NesthydrationJS = require('nesthydrationjs')();
-var _                 = require('lodash');
-var uuidV4            = require('uuid/v4');
+const _               = require('lodash');
+const uuidV4          = require('uuid/v4');
+const moment          = require('moment-timezone');
+const Promise        = require('bluebird');
 
 const { errorResponse, successResponseWithData, successResponseWithoutData } = require('./responsers');
 
 const { users_definition } = require('./definition');
 
-const app = express();
-const db = admin.firestore();
+const app  = express();
+const db   = admin.firestore();
 const auth = admin.auth();
+const now  = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss")
 
 db.settings({ timestampsInSnapshots: true });
 
@@ -43,24 +46,36 @@ app.get('/users', (req, res) => {
 })
 
 // REGISTER NEW USER
-app.post('/register', async (req, res) => {
+app.post('/register', (req, res) => {
 	const user_id = uuidV4();
 	const form = {
+		id: user_id,
 		first_name: req.body['first_name'],
 		last_name: req.body['last_name'],
 		email: req.body['email'],
 		password: req.body['password'],
+		phone_number: null,
+		gender: null,
+		avatar: null,
+		birth_of_date: null,
+		country: null,
+		state: null,
+		region: null,
+		zipcode: null,
+		address: null,
 		is_premium: false,
-		is_confirmed: false,
+		is_confirmed: false,	
+		created_at: now,
+		updated_at: now
 	};
 
 	function registerUser(data) {
 		auth.createUser(data)
 			.then(userRecord => {
-				console.log(userRecord.uid);
-				return userRecord.uid;
+				console.log(`Successfully created new user: ${userRecord}`);
 			})
 			.catch(error => {
+				console.log(`Error at 'registerUser': ${error}`);
 				res.status(500).send(errorResponse(
 					"Failed to register user",
 					500
@@ -68,28 +83,23 @@ app.post('/register', async (req, res) => {
 			})
 	}
 
-	async function addUsertoDB(responseAuth) {
-		const dataCombination = await {
-				id: user_id,
-				...form,
-				email_auth: responseAuth
-		}
-		const finalData = await NesthydrationJS.nest(dataCombination, users_definition);
+	function addUsertoDB(input) {
+		const finalData = NesthydrationJS.nest(input, users_definition);
 		console.log(finalData);
 		firebaseHelper.firestore
-			.createNewDocument(db, 'users', finalData[0])
+			.createDocumentWithID(db, 'users', finalData[0].id, finalData[0])
 			.then(response => {
 				  console.log(response)
 					res.status(201).send(
 						successResponseWithData(
-							response,
+							response.id,
 							"Welcome to Fling! You've succed to make an account.",
 							201
 						)
 					);
 			})
 			.catch(error => {
-				console.log(error, "Failed add user to DB");
+				console.log(`Error at 'addUsertoDB' : ${error}`);
 				res.status(500).send(errorResponse(
 					"Failed to add user to DB",
 					500
@@ -97,17 +107,18 @@ app.post('/register', async (req, res) => {
 			});
 	} 
 
-	try {
-			const registerResult = await registerUser(form);
-			const finalResult = await addUsertoDB(registerResult);
-			return finalResult;
-	} catch(error) {
-			console.log(error, "/register is failed");
+	Promise.try(() => registerUser(form))
+	  .then(() => {
+			addUsertoDB(form);
+		})
+		.catch(error => {
+			console.log(`'/register is failed: ${error}`);
 			res.status(500).send(errorResponse(
 				"/register is failed",
 				500
 			));
-	}
+		});
+
 });
 
 // TEST
