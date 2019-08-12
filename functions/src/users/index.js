@@ -15,109 +15,122 @@ const auth = admin.auth();
 
 db.settings({ timestampsInSnapshots: true });
 
+// GET ALL USERS
 app.get('/users', (req, res) => {
-    firebaseHelper.firestore
-        .backup(db, 'users')
-        .then(snapshot => {
-
-            let data = _.toArray(snapshot.users);
-            
-            return data;
-        })
-        .then(data => {
-            const response = successResponseWithData(
-                data,
-                "Success to GET users data",
-                200
-            );
-            res.status(200).send(response)
-            /* res.status(200).send(data) */
-        })
-        .catch(error => {
-            const response = errorResponse(
-                "Failed to GET users data",
-                500
-            );
-            res.status(500).send(response)
-            console.log(`Cannot get contacts: ${error}`)
-        });
+	firebaseHelper.firestore
+		.backup(db, 'users')
+		.then(snapshot => {
+				let data = _.toArray(snapshot.users);
+				return data;
+		})
+		.then(data => {
+				const response = successResponseWithData(
+						data,
+						"Success to GET users data",
+						200
+				);
+				res.status(200).send(response)
+				/* res.status(200).send(data) */
+		})
+		.catch(error => {
+				const response = errorResponse(
+						"Failed to GET users data",
+						500
+				);
+				res.status(500).send(response)
+				console.log(`Cannot get contacts: ${error}`)
+		});
 })
 
+// REGISTER NEW USER
 app.post('/register', async (req, res) => {
+	const user_id = uuidV4();
+	const form = {
+		first_name: req.body['first_name'],
+		last_name: req.body['last_name'],
+		email: req.body['email'],
+		password: req.body['password'],
+		is_premium: false,
+		is_confirmed: false,
+	};
 
-    const user_id = uuidV4();
+	function registerUser(data) {
+		auth.createUser(data)
+			.then(userRecord => {
+				console.log(userRecord.uid);
+				return userRecord.uid;
+			})
+			.catch(error => {
+				res.status(500).send(errorResponse(
+					"Failed to register user",
+					500
+				))
+			})
+	}
 
-    const form = {
-        first_name: req.body['first_name'],
-        last_name: req.body['last_name'],
-        email: req.body['email'],
-        password: req.body['password']
-    };
+	async function addUsertoDB(responseAuth) {
+		const dataCombination = await {
+				id: user_id,
+				...form,
+				email_auth: responseAuth
+		}
+		const finalData = await NesthydrationJS.nest(dataCombination, users_definition);
+		console.log(finalData);
+		firebaseHelper.firestore
+			.createNewDocument(db, 'users', finalData[0])
+			.then(response => {
+				  console.log(response)
+					res.status(201).send(
+						successResponseWithData(
+							response,
+							"Welcome to Fling! You've succed to make an account.",
+							201
+						)
+					);
+			})
+			.catch(error => {
+				console.log(error, "Failed add user to DB");
+				res.status(500).send(errorResponse(
+					"Failed to add user to DB",
+					500
+				))
+			});
+	} 
 
-    function registerUser(data) {
-        auth.createUser(data)
-          .then(userRecord => {
-              return userRecord;
-          })
-          .catch(error => {
-              res.status(500).send(errorResponse(
-                  "Failed to register user",
-                  500
-              ))
-          })
-    }
-
-    async function addUsertoDB(data, responseAuth) {
-        const dataCombination = {
-            id: user_id,
-            ...form,
-            email_auth: responseAuth.uid
-        }
-        firebaseHelper.firestore
-              .createNewDocument(db, 'users', data[0])
-              .then(response => {
-
-              })
-    } 
-
-    try {
-        await auth.createUser(form)
-            .then(response => {
-                const data = NesthydrationJS.nest(form, users_definition);
-                firebaseHelper,firestore.createNewDocument(db, 'users', data[0]);
-                res.status(200).send(response);
-                console.log('Success: ', response.uid);
-            })
-            .catch(error => {
-                console.log('Error: ', error)
-            });
-    } catch(error) {
-        console.log(error);
-        res.status(500).send(error);
-    }
-
+	try {
+			const registerResult = await registerUser(form);
+			const finalResult = await addUsertoDB(registerResult);
+			return finalResult;
+	} catch(error) {
+			console.log(error, "/register is failed");
+			res.status(500).send(errorResponse(
+				"/register is failed",
+				500
+			));
+	}
 });
 
+// TEST
 app.post('/users', async (req, res) => {
-    const form = {
-        first_name: req.body['first_name'],
-        last_name: req.body['last_name'],
-        email: req.body['email'],
-        phone_number: req.body['phone_number'],
-        is_premium: false
-    };
+	const form = {
+		first_name: req.body['first_name'],
+		last_name: req.body['last_name'],
+		email: req.body['email'],
+		phone_number: req.body['phone_number'],
+		is_premium: false
+	};
 
-    try {
-        const data = await NesthydrationJS.nest(form, users_definition);
-        console.log(data);
-        const newDoc = await firebaseHelper.firestore
-            .createNewDocument(db, 'users', data[0]);
+	try {
+		const data = await NesthydrationJS.nest(form, users_definition);
+		console.log(data);
+		const newDoc = await firebaseHelper.firestore
+				.createNewDocument(db, 'users', data[0]);
 
-        res.status(201).send(`Created a new contact: ${newDoc.id}`);
-    } catch (error) {
-        res.status(400).send(`Contact should only contains firstName, lastName and email!!!`)
-        console.log(error);
-    } 
+		res.status(201).send(`Created a new contact: ${newDoc.id}`);
+	} catch (error) {
+		res.status(400).send(`Contact should only contains firstName, lastName and email!!!`)
+		console.log(error);
+	} 
 });
 
 module.exports = app;
