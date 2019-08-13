@@ -7,7 +7,7 @@ const uuidV4          = require('uuid/v4');
 const moment          = require('moment-timezone');
 const Promise        = require('bluebird');
 
-const { errorResponse, successResponseWithData, successResponseWithoutData } = require('./responsers');
+const { errorResponse, successResponseWithData, registerResponse } = require('./responsers');
 
 const { users_definition } = require('./definition');
 
@@ -69,55 +69,100 @@ app.post('/register', (req, res) => {
 		updated_at: now
 	};
 
-	function registerUser(data) {
-		auth.createUser(data)
-			.then(userRecord => {
-				console.log(`Successfully created new user: ${userRecord}`);
+	function emailChecking(data) {
+		const email = data.email;
+		console.log(email);
+
+		const query = [[ 'email', '==', email]];
+
+		firebaseHelper.firestore.queryData(db, 'users', query)
+		  .then(response => {
+				console.log(response);
+				res.send("Data was found " + response);
 			})
 			.catch(error => {
-				console.log(`Error at 'registerUser': ${error}`);
-				res.status(500).send(errorResponse(
-					"Failed to register user",
-					500
-				))
+				console.log(error);
+				res.send(error);
 			})
+
+		/* db.collection('users').where('email', '==', email).get()
+		.then(snapshot => {
+			console.log(snapshot);
+			return snapshot;
+		})
+		.catch(error => {
+			console.log(error);
+			res.status(500).send(errorResponse(
+				"Failed to check email",
+				500
+			))
+		}) */
+	}
+
+	function registerUser(data) {
+		auth.createUser(data)
+		.then(userRecord => {
+			console.log(`Successfully created new user: ${userRecord}`);
+		})
+		.catch(error => {
+			console.log(`Error at 'registerUser': ${error}`);
+			res.status(500).send(errorResponse(
+				"Failed to register user",
+				500
+			))
+		})
 	}
 
 	function addUsertoDB(input) {
 		const finalData = NesthydrationJS.nest(input, users_definition);
 		console.log(finalData);
 		firebaseHelper.firestore
-			.createDocumentWithID(db, 'users', finalData[0].id, finalData[0])
-			.then(response => {
-				  console.log(response)
-					res.status(201).send(
-						successResponseWithData(
-							response.id,
-							"Welcome to Fling! You've succed to make an account.",
-							201
-						)
-					);
-			})
-			.catch(error => {
-				console.log(`Error at 'addUsertoDB' : ${error}`);
-				res.status(500).send(errorResponse(
-					"Failed to add user to DB",
-					500
-				))
-			});
-	} 
-
-	Promise.try(() => registerUser(form))
-	  .then(() => {
-			addUsertoDB(form);
+		.createDocumentWithID(db, 'users', finalData[0].id, finalData[0])
+		.then(response => {
+				console.log(response)
+				res.status(201).send(
+					registerResponse(
+						response.id,
+						"Welcome to Fling! You've succed to make an account.",
+						201
+					)
+				);
 		})
 		.catch(error => {
-			console.log(`'/register is failed: ${error}`);
-			res.status(500).send(errorResponse(
-				"/register is failed",
-				500
-			));
+			console.log(`Error at 'addUsertoDB' : ${error}`);
+			res.status(401).send(errorResponse(
+				"Failed to add user to DB",
+				401
+			))
 		});
+	} 
+
+	/* Promise.try(() => registerUser(form))
+	.then(() => {
+		addUsertoDB(form);
+	})
+	.catch(error => {
+		console.log(`'/register is failed: ${error}`);
+		res.status(500).send(errorResponse(
+			"/register is failed",
+			401
+		));
+	}); */
+
+	Promise.try(() => emailChecking(form))
+	.then(response => {
+		console.log(response)
+		if(!response) {
+			response;
+		} else {
+			res.status(200).send(successResponseWithData(
+				response,
+				"User is exist.",
+				200
+			))
+		}
+	})
+	.catch(error => console.log(error));
 
 });
 

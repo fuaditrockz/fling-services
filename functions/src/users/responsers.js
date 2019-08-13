@@ -17,3 +17,12 @@ exports.successResponseWithoutData = (response, message, status) => ({
 	status: status,
 	data: response
 })
+
+exports.registerResponse = (response, message, status) => ({
+	success: true,
+	message: message,
+	status: status,
+	data: {
+		user_id: response
+	}
+})
