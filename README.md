@@ -2,6 +2,8 @@
 
 The application that build with [Firebase Cloud Funtions](https://firebase.google.com/products/functions/ "Firebase Cloud Functions") based. This is REST API for Fling - A todo list application that you can download on Playstore or Appstore.
 
+## Setup & Project Commands
+
 ### Download the repository
 
 Just choose some folder on your terminal to put this project. And then run this command:
@@ -49,3 +51,15 @@ To use all Firebase method, event or functionality as locally. You must install 
 
 > To stop the running server just pres CTRL/CMD + C
 
+### Deployment
+
+Deployment is useful for putting all the **functions** that we have built into available online and can be accessed in the cloud without having to run it locally. This will automatically become a function that's already in the **production stage**. Please be careful in doing this, because it will significantly affect real users.
+```
+> firebase deploy
+```
+
+***
+
+## Services Endpoint
+
+~ Comming soon
