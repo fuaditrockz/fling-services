@@ -66,3 +66,6 @@ node_modules/
 
 # Firebase Key Credentials
 key.json
+
+# For Mac users
+.DS_Store
