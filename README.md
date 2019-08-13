@@ -2,6 +2,24 @@
 
 The application that build with Firebase Functions. This is REST API for Fling - A todo list application that you can download on Playstore or Appstore.
 
+### Download the repository
+
+Just choose some folder on your terminal to put this project. And then run this command:
+```
+> git clone https://github.com/fuaditrockz/fling-services.git
+```
+
+And then choose the `functions` folder:
+```
+> cd functions
+```
+
+And then run `npm` command to get all packages:
+```
+> npm install
+```
+
+
 ### Running locally
 
 1. Please make sure you have a privillege to contribute at this project. Just [send me a message](muhammadfuaditrockz@gmail.com "Fuadit's Email")send me a message to get access to the database account(Firebase).
@@ -21,7 +39,6 @@ The application that build with Firebase Functions. This is REST API for Fling -
 > export GOOGLE_APPLICATION_CREDENTIALS="path/to/key.json"
 
 > firebase emulators:start
-
 ```
 
 > To stop the running server just pres CTRL/CMD + C
