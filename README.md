@@ -1,6 +1,6 @@
 # Fling Services
 
-The application that build with Firebase Functions. This is REST API for Fling - A todo list application that you can download on Playstore or Appstore.
+The application that build with [Firebase Cloud Funtions](https://firebase.google.com/products/functions/ "Firebase Cloud Functions") based. This is REST API for Fling - A todo list application that you can download on Playstore or Appstore.
 
 ### Download the repository
 
@@ -19,10 +19,16 @@ And then run `npm` command to get all packages:
 > npm install
 ```
 
+### Install Firebase Tools
+
+To use all Firebase method, event or functionality as locally. You must install the Firebase Tools into your local computer with npm.
+```
+> npm install -g firebase-tools
+```
 
 ### Running locally
 
-1. Please make sure you have a privillege to contribute at this project. Just [send me a message](muhammadfuaditrockz@gmail.com "Fuadit's Email")send me a message to get access to the database account(Firebase).
+1. Please make sure you have a privillege to contribute at this project. Just [send me a message](muhammadfuaditrockz@gmail.com "Fuadit's Email") send me a message to get access to the database account(Firebase).
 
 2. If you have an access to the database, please open [Firebase Account Pannel](https://console.firebase.google.com/project/db-test-adit/overview "Fling Firebase").
 
