@@ -24,6 +24,7 @@ app.get('/users', (req, res) => {
 		.backup(db, 'users')
 		.then(snapshot => {
 				let data = _.toArray(snapshot.users);
+				console.log(data);
 				return data;
 		})
 		.then(data => {
@@ -50,6 +51,7 @@ app.post('/register', (req, res) => {
 	const user_id = uuidV4();
 	const form = {
 		id: user_id,
+		username: req.body['username'],
 		first_name: req.body['first_name'],
 		last_name: req.body['last_name'],
 		email: req.body['email'],
@@ -69,35 +71,48 @@ app.post('/register', (req, res) => {
 		updated_at: now
 	};
 
+	/* function emailChecking(data) {
+		auth.getUserByEmail(data.email)
+		.then(response => {
+			console.log(response);
+			res.send(`Success: ${response}`);
+		})
+		.catch(error => {
+			res.send(error);
+		})
+	} */
+
 	function emailChecking(data) {
-		const email = data.email;
-		console.log(email);
-
-		const query = [[ 'email', '==', email]];
-
-		firebaseHelper.firestore.queryData(db, 'users', query)
+		let users = db.collection('users').where('email', '==', data.email);
+		users.get()
 		  .then(response => {
-				console.log(response);
-				res.send("Data was found " + response);
+				let docs = response.docs;
+				if (response.empty) {
+					console.log('Data not found');
+					res.send('Data not found');
+				} else {
+					for (let doc of docs) {
+						console.log(`Document found at path: ${doc.ref.path}`);
+						res.send(doc.ref.path);
+					}
+				}
 			})
 			.catch(error => {
 				console.log(error);
 				res.send(error);
 			})
-
-		/* db.collection('users').where('email', '==', email).get()
-		.then(snapshot => {
-			console.log(snapshot);
-			return snapshot;
-		})
-		.catch(error => {
-			console.log(error);
-			res.status(500).send(errorResponse(
-				"Failed to check email",
-				500
-			))
-		}) */
 	}
+
+	/* function emailChecking(data) {
+		const qArray = [ [ 'email', '==', 'bazengan@gmail.com' ] ];
+
+		firebaseHelper.firestore
+		.queryData(db, 'users', qArray)
+		.then(docs => {
+			console.log(docs);
+			return docs;
+		})
+	} */
 
 	function registerUser(data) {
 		auth.createUser(data)
@@ -117,7 +132,7 @@ app.post('/register', (req, res) => {
 		const finalData = NesthydrationJS.nest(input, users_definition);
 		console.log(finalData);
 		firebaseHelper.firestore
-		.createDocumentWithID(db, 'users', finalData[0].id, finalData[0])
+		.createDocumentWithID(db, 'users', finalData[0].username, finalData[0])
 		.then(response => {
 				console.log(response)
 				res.status(201).send(
@@ -149,20 +164,7 @@ app.post('/register', (req, res) => {
 		));
 	}); */
 
-	Promise.try(() => emailChecking(form))
-	.then(response => {
-		console.log(response)
-		if(!response) {
-			response;
-		} else {
-			res.status(200).send(successResponseWithData(
-				response,
-				"User is exist.",
-				200
-			))
-		}
-	})
-	.catch(error => console.log(error));
+	return emailChecking(form);
 
 });
 
