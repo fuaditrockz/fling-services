@@ -5,7 +5,7 @@ const NesthydrationJS = require('nesthydrationjs')();
 const _               = require('lodash');
 const uuidV4          = require('uuid/v4');
 const moment          = require('moment-timezone');
-const Promise        = require('bluebird');
+const jwt             = require('jsonwebtoken');
 
 const { errorResponse, successResponseWithData, registerResponse } = require('./responsers');
 
@@ -49,6 +49,14 @@ app.get('/users', (req, res) => {
 // REGISTER NEW USER
 app.post('/register', (req, res) => {
 	const user_id = uuidV4();
+	const generatedToken = jwt.sign(
+		{
+			username: req.body['username'],
+			email: req.body['email'],
+			full_name: req.body['first_name'] + ' ' + req.body['last_name']
+		},
+		'fling-application'
+	)
 	const form = {
 		id: user_id,
 		username: req.body['username'],
@@ -67,65 +75,111 @@ app.post('/register', (req, res) => {
 		address: null,
 		is_premium: false,
 		is_confirmed: false,	
+		token: generatedToken,
 		created_at: now,
 		updated_at: now
 	};
 
-	/* function emailChecking(data) {
-		auth.getUserByEmail(data.email)
-		.then(response => {
-			console.log(response);
-			res.send(`Success: ${response}`);
+	const REGISTER_USER = data => {
+		return new Promise((resolve, reject) => {
+			data
+			? resolve(data)
+			: reject(res.status(412).send(errorResponse(
+				'Fields cannot be null. Please make sure if you have been fill all of inputs.',
+				412
+			)))
 		})
-		.catch(error => {
-			res.send(error);
-		})
-	} */
+	}
+
+	function formValidation(data) {
+		switch (true) {
+			case !form.first_name || !form.last_name:
+				res.status(402).send(errorResponse(
+					"Please make sure to fill your first name or last name completely.",
+					402
+				));
+				break;
+			case !form.email:
+				res.status(402).send(errorResponse(
+					"Please make sure to fill your email.",
+					402
+				));
+				break;
+			case !form.password:
+				res.status(402).send(errorResponse(
+					"Please make sure to fill your correct password",
+					402
+				));
+				break;
+			case !form.username:
+				res.status(402).send(errorResponse(
+					"Please make sure to fill your username",
+					402
+				));
+				break;
+			default:
+				return data;
+		}
+	}
 
 	function emailChecking(data) {
-		let users = db.collection('users').where('email', '==', data.email);
-		users.get()
-		  .then(response => {
-				let docs = response.docs;
+		let checkResult = db.collection('users').where('contact.email', '==', data.email).get()
+		    .then(response => {
 				if (response.empty) {
-					console.log('Data not found');
-					res.send('Data not found');
+					console.log(`YASSS! Data: ${data.email} not found. Just go ahead.`);
 				} else {
-					for (let doc of docs) {
-						console.log(`Document found at path: ${doc.ref.path}`);
-						res.send(doc.ref.path);
+					for ( let doc of response.docs ) {
+						console.log(doc.ref.id);
+						return doc.ref.id;
 					}
 				}
 			})
-			.catch(error => {
-				console.log(error);
-				res.send(error);
-			})
+		return checkResult;
 	}
 
-	/* function emailChecking(data) {
-		const qArray = [ [ 'email', '==', 'bazengan@gmail.com' ] ];
-
-		firebaseHelper.firestore
-		.queryData(db, 'users', qArray)
-		.then(docs => {
-			console.log(docs);
-			return docs;
-		})
+	/* function usersAuthentication(is_exist, data) {
+		if (is_exist) {
+			auth.createCustomToken(data.username)
+			.then(response => {
+				console.log(response);
+				res.send(response);
+			})
+			.catch(error => {
+				console.log(error);
+				res.status(500).send(errorResponse(
+					`Failed to get access token: ${error}`,
+					500
+				))
+			});
+		} else {
+			res.send(errorResponse(
+				`We're sorry, this user is already exists. Please make sure if you have another email.`,
+				412
+			));
+		}
 	} */
 
-	function registerUser(data) {
-		auth.createUser(data)
-		.then(userRecord => {
-			console.log(`Successfully created new user: ${userRecord}`);
-		})
-		.catch(error => {
-			console.log(`Error at 'registerUser': ${error}`);
-			res.status(500).send(errorResponse(
-				"Failed to register user",
-				500
-			))
-		})
+	function registerUser(is_exist, data) {
+		console.log(is_exist);
+		if (!is_exist) {
+			auth.createUser(data)
+			.then(userRecord => {
+				console.log(`Successfully created new user: ${userRecord}`);
+				res.send(userRecord);
+			})
+			.catch(error => {
+				console.log(`Error at 'registerUser': ${error}`);
+				res.status(500).send(errorResponse(
+					"Failed to register user",
+					500
+				))
+			})
+		} else {
+			res.send(errorResponse(
+				`We're sorry, this user is already exists. Please make sure if you have another email.`,
+				412
+			));
+		}
 	}
 
 	function addUsertoDB(input) {
@@ -152,19 +206,11 @@ app.post('/register', (req, res) => {
 		});
 	} 
 
-	/* Promise.try(() => registerUser(form))
-	.then(() => {
-		addUsertoDB(form);
-	})
-	.catch(error => {
-		console.log(`'/register is failed: ${error}`);
-		res.status(500).send(errorResponse(
-			"/register is failed",
-			401
-		));
-	}); */
-
-	return emailChecking(form);
+	REGISTER_USER(form)
+	  .then(res => formValidation(res))
+	  .then(res => emailChecking(res))
+	  .then(res => registerUser(res, form))
+	  .catch(err => res.send(err));
 
 });
 

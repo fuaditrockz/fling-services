@@ -19,6 +19,9 @@ exports.users_definition = [
             zipcode: "zipcode",
             address: "address"
         },
+        authentication: {
+            token: "token"
+        },
         is_confirmed: { column: "is_confirmed", type: "BOOLEAN" },
         is_premium: { column: "is_premium", type: "BOOLEAN" },
         created_at: "created_at",
