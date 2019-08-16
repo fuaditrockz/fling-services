@@ -1,4 +1,5 @@
 const admin           = require('firebase-admin');
+const functions = require('firebase-functions');
 const express         = require('express');
 const firebaseHelper  = require('firebase-functions-helper');
 const NesthydrationJS = require('nesthydrationjs')();
@@ -6,6 +7,7 @@ const _               = require('lodash');
 const uuidV4          = require('uuid/v4');
 const moment          = require('moment-timezone');
 const jwt             = require('jsonwebtoken');
+const platform        = require('platform');
 
 const { errorResponse, successResponseWithData, registerResponse } = require('./responsers');
 
@@ -125,13 +127,9 @@ app.post('/register', (req, res) => {
 	function emailChecking(data) {
 		let checkResult = db.collection('users').where('contact.email', '==', data.email).get()
 		    .then(response => {
-				if (response.empty) {
-					console.log(`YASSS! Data: ${data.email} not found. Just go ahead.`);
-				} else {
-					for ( let doc of response.docs ) {
-						console.log(doc.ref.id);
-						return doc.ref.id;
-					}
+				for ( let doc of response.docs ) {
+					console.log(doc.ref.id);
+					return doc.ref.id;
 				}
 			})
 		return checkResult;
@@ -159,27 +157,24 @@ app.post('/register', (req, res) => {
 		}
 	} */
 
-	function registerUser(is_exist, data) {
-		console.log(is_exist);
-		if (!is_exist) {
-			auth.createUser(data)
+	function registerUser(data) {
+		auth.createUser(data)
 			.then(userRecord => {
 				console.log(`Successfully created new user: ${userRecord}`);
+				res.status(201).send(registerResponse(
+					`Successfully created new user.`,
+					201,
+					userRecord
+				))
 				res.send(userRecord);
 			})
 			.catch(error => {
-				console.log(`Error at 'registerUser': ${error}`);
+				console.log(`'registerUser()': ${error}`);
 				res.status(500).send(errorResponse(
-					"Failed to register user",
+					`${error}`,
 					500
 				))
 			})
-		} else {
-			res.send(errorResponse(
-				`We're sorry, this user is already exists. Please make sure if you have another email.`,
-				412
-			));
-		}
 	}
 
 	function addUsertoDB(input) {
@@ -209,10 +204,25 @@ app.post('/register', (req, res) => {
 	REGISTER_USER(form)
 	  .then(res => formValidation(res))
 	  .then(res => emailChecking(res))
-	  .then(res => registerUser(res, form))
+	  .then(() => registerUser(form))
 	  .catch(err => res.send(err));
 
 });
+
+app.get('/test_platform', (req, res) => {
+	var ua = req.headers['user-agent'];
+
+	var info = platform.parse(ua);
+	let platformSpec = {
+		name: info.name,
+		version: info.version,
+		layout: info.layout,
+		os: info.os,
+		description: info.description
+	}
+
+	res.send(platformSpec);
+})
 
 // TEST
 app.post('/users', async (req, res) => {

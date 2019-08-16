@@ -18,7 +18,7 @@ exports.successResponseWithoutData = (response, message, status) => ({
 	data: response
 })
 
-exports.registerResponse = (response, message, status) => ({
+exports.registerResponse = (message, status, response) => ({
 	success: true,
 	message: message,
 	status: status,
