@@ -6,8 +6,8 @@ exports.users_definition = [
             last_name: "last_name"
         },
         contact: {
-            email: "email",
-            phonenumber: "phone_number"
+            phonenumber: "phone_number",
+            address: "address"
         },
         gender: "gender",
         avatar: "avatar",
@@ -20,11 +20,22 @@ exports.users_definition = [
             address: "address"
         },
         authentication: {
-            token: "token"
+            email: "email",
+            password: "password"
         },
         is_confirmed: { column: "is_confirmed", type: "BOOLEAN" },
         is_premium: { column: "is_premium", type: "BOOLEAN" },
         created_at: "created_at",
         updated_at: "updated_at"
+    }
+]
+
+exports.auth_definition = [
+    {
+        user_id: "user_id",
+        deviceInfo: "deviceInfo",
+        access_token: "access_token",
+        auth_type: "auth_type",
+        expires_in: "expires_in",
     }
 ]
