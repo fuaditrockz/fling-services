@@ -1,5 +1,4 @@
 const admin           = require('firebase-admin');
-const functions = require('firebase-functions');
 const express         = require('express');
 const firebaseHelper  = require('firebase-functions-helper');
 const NesthydrationJS = require('nesthydrationjs')();
@@ -8,14 +7,16 @@ const uuidV4          = require('uuid/v4');
 const moment          = require('moment-timezone');
 const jwt             = require('jsonwebtoken');
 const platform        = require('platform');
+const bcrypt          = require('bcrypt');
+
+const private_key = require('../../key.json');
 
 const { errorResponse, successResponseWithData, registerResponse } = require('./responsers');
 
-const { users_definition } = require('./definition');
+const { users_definition, auth_definition } = require('./definition');
 
 const app  = express();
 const db   = admin.firestore();
-const auth = admin.auth();
 const now  = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss")
 
 db.settings({ timestampsInSnapshots: true });
@@ -51,14 +52,27 @@ app.get('/users', (req, res) => {
 // REGISTER NEW USER
 app.post('/register', (req, res) => {
 	const user_id = uuidV4();
+
+	var ua = req.headers['user-agent'];
+
 	const generatedToken = jwt.sign(
 		{
 			username: req.body['username'],
 			email: req.body['email'],
 			full_name: req.body['first_name'] + ' ' + req.body['last_name']
 		},
-		'fling-application'
+		private_key.private_key,
+		{ expiresIn: "1y", issuer: "Fling Corporation" },
+		(err, token) => {
+			if(token) {
+				return token;
+			} else {
+				console.log(`Error when generate token: ${err}`);
+				res.send('Error when generate token.');
+			}
+		}
 	)
+
 	const form = {
 		id: user_id,
 		username: req.body['username'],
@@ -82,7 +96,7 @@ app.post('/register', (req, res) => {
 		updated_at: now
 	};
 
-	const REGISTER_USER = data => {
+	/* const REGISTER_USER = data => {
 		return new Promise((resolve, reject) => {
 			data
 			? resolve(data)
@@ -91,7 +105,7 @@ app.post('/register', (req, res) => {
 				412
 			)))
 		})
-	}
+	} */
 
 	function formValidation(data) {
 		switch (true) {
@@ -125,87 +139,96 @@ app.post('/register', (req, res) => {
 	}
 
 	function emailChecking(data) {
-		let checkResult = db.collection('users').where('contact.email', '==', data.email).get()
-		    .then(response => {
-				for ( let doc of response.docs ) {
-					console.log(doc.ref.id);
-					return doc.ref.id;
-				}
-			})
-		return checkResult;
-	}
+		let result = db.collection('users').where('authentication.email', '==', data.email).get()
+		.then(snapshot => {
+			if (snapshot.empty) {
+				console.log('No matching documents');
+				return;
+			}
 
-	/* function usersAuthentication(is_exist, data) {
-		if (is_exist) {
-			auth.createCustomToken(data.username)
-			.then(response => {
-				console.log(response);
-				res.send(response);
-			})
-			.catch(error => {
-				console.log(error);
-				res.status(500).send(errorResponse(
-					`Failed to get access token: ${error}`,
-					500
-				))
-			});
-		} else {
-			res.send(errorResponse(
-				`We're sorry, this user is already exists. Please make sure if you have another email.`,
-				412
-			));
-		}
-	} */
+			let list = [];
 
-	function registerUser(data) {
-		auth.createUser(data)
-			.then(userRecord => {
-				console.log(`Successfully created new user: ${userRecord}`);
-				res.status(201).send(registerResponse(
-					`Successfully created new user.`,
-					201,
-					userRecord
-				))
-				res.send(userRecord);
+			snapshot.forEach(doc => {
+				/* console.log(doc.id, '=>', doc.data()); */
+				/* res.send(doc.data()); */
+				list.push(doc.data());
 			})
-			.catch(error => {
-				console.log(`'registerUser()': ${error}`);
-				res.status(500).send(errorResponse(
-					`${error}`,
-					500
-				))
-			})
-	}
-
-	function addUsertoDB(input) {
-		const finalData = NesthydrationJS.nest(input, users_definition);
-		console.log(finalData);
-		firebaseHelper.firestore
-		.createDocumentWithID(db, 'users', finalData[0].username, finalData[0])
-		.then(response => {
-				console.log(response)
-				res.status(201).send(
-					registerResponse(
-						response.id,
-						"Welcome to Fling! You've succed to make an account.",
-						201
-					)
-				);
+			return list;
 		})
-		.catch(error => {
-			console.log(`Error at 'addUsertoDB' : ${error}`);
-			res.status(401).send(errorResponse(
-				"Failed to add user to DB",
-				401
+		.catch(err => {
+			console.log(err);
+			res.status(500).send(errorResponse(
+				'Failed to get data from server',
+				500
 			))
 		});
+
+		return result;
+	}
+
+	function addUsertoDB(is_exist, input) {
+		const result = [];
+		if(!is_exist) {
+			let hash = bcrypt.hashSync(input.password, 10);
+			input.password = hash;
+			const finalData = NesthydrationJS.nest(input, users_definition);
+			firebaseHelper.firestore.createDocumentWithID(db, 'users', finalData[0].id, finalData[0])
+			.then(response => {
+				result.push(response);
+			})
+			.catch(err => {
+				console.log(`Error at 'addUsertoDB' : ${err}`);
+				res.status(401).send(errorResponse(
+					"Failed to add user to DB",
+					401
+				))
+			})
+		} else {
+			res.status(401).send(errorResponse(
+				`Email: ${input.email} has been taken. Please make sure to register with correct email.`,
+				401
+			))
+		}
+		return result;
 	} 
 
-	REGISTER_USER(form)
-	  .then(res => formValidation(res))
-	  .then(res => emailChecking(res))
-	  .then(() => registerUser(form))
-	  .catch(err => res.send(err));
+	async function createSessionLogin(data) {
+		const ua = req.headers['user-agent'];
+		const info = platform.parse(ua);
+		let platformSpec = {
+			name: info.name,
+			version: info.version,
+			layout: info.layout,
+			os: info.os,
+			description: info.description
+		}
+		const sessionLoginData = {
+			user_id: data.id,
+			deviceInfo: platformSpec,
+			access_token: null,
+			auth_type: "regular-email"
+		}
+		const finalData = NesthydrationJS.nest(sessionLoginData, auth_definition);
+
+		await db.collection('auth').add(finalData[0])
+		.then(ref => {
+			res.send(ref);
+		})
+		.catch(err => res.send(err));
+	}
+
+	async function REGISTER_USER(data) {
+		try {
+			const formValidationResult = await formValidation(data);
+			const emailCheckingResult = await emailChecking(formValidationResult);
+			await addUsertoDB(emailCheckingResult, data);
+			await createSessionLogin(data);
+		} catch(error) {
+			res.send(error);
+		}
+	}
+
+	REGISTER_USER(form);
 
 });
 
