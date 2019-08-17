@@ -22,7 +22,5 @@ exports.registerResponse = (message, status, response) => ({
 	success: true,
 	message: message,
 	status: status,
-	data: {
-		user_id: response
-	}
+	data: response
 })
