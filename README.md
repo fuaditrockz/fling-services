@@ -57,9 +57,3 @@ Deployment is useful for putting all the **functions** that we have built into a
 ```
 > firebase deploy
 ```
-
-***
-
-## Services Endpoint
-
-~ Comming soon
